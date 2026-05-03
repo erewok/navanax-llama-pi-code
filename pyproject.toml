@@ -1,0 +1,9 @@
+[project]
+name = "navanax-llama-pi-code"
+version = "0.1.0"
+description = "Navanax LLaMA PI Code setup"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "rich"
+]

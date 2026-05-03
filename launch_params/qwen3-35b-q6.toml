@@ -1,0 +1,24 @@
+# Qwen3.6 35B-A3B MoE — Q6_K (~25GB)
+# Best balance of quality + speed + headroom on 64GB
+
+[hf]
+repo = "unsloth/Qwen3.6-35B-A3B-GGUF"
+tag  = "UD-Q6_K"
+
+[meta]
+name    = "Qwen3.6 35B-A3B Q6_K (Local)"
+quant   = "Q6_K"
+size_gb = 25
+moe     = true
+active_params_b = 3
+
+[launch]
+threads       = 10
+batch         = 1024
+ubatch        = 256
+context       = 131072
+kv_cache_k    = "q8_0"
+kv_cache_v    = "q8_0"
+reasoning     = true
+max_tokens    = 8192
+context_window = 131072

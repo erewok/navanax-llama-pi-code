@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+exec uv run --directory "$(dirname "$0")" python "$(dirname "$0")/llama-launch.py" "$@"

@@ -1,0 +1,25 @@
+# Gemma 4 31B — Q8_0 (~35GB)
+# Dense model, all 31B active. Frontier-level quality.
+# Tight on 64GB: ~35GB model + ~12GB KV (131k) + ~10GB OS = ~57GB
+
+[hf]
+repo = "unsloth/gemma-4-31b-it-GGUF"
+tag  = "Q8_0"
+
+[meta]
+name    = "Gemma 4 31B Q8_0 (Local)"
+quant   = "Q8_0"
+size_gb = 35
+moe     = false
+active_params_b = 31
+
+[launch]
+threads        = 10
+batch          = 768
+ubatch         = 192
+context        = 131072
+kv_cache_k     = "q8_0"
+kv_cache_v     = "q8_0"
+reasoning      = true
+max_tokens     = 8192
+context_window = 131072

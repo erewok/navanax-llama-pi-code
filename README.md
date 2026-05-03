@@ -1,15 +1,23 @@
 # llama — Local LLM Server for M5 Pro / 64GB
 
-Launch and manage [llama-server](https://github.com/ggerganov/llama.cpp) instances with zero cloud dependency. Optimized for MacBook Pro M5 Pro with 64GB unified memory.
+Launch and manage [llama-server](https://github.com/ggerganov/llama.cpp) instances. Optimized for MacBook Pro M5 Pro with 64GB unified memory.
 
 ## Quick Start
 
 ```bash
-./llama-launch.sh              # Interactive model selector
-./llama-launch.sh qwen3-35b-q6 # Launch Qwen3.6 35B Q6_K directly
-./llama-launch.sh stop         # Stop the running server
-./llama-launch.sh status       # Check server status
-./llama-launch.sh list         # List available models
+./llama-launch              # Interactive model selector
+./llama-launch qwen3-35b-q6 # Launch Qwen3.6 35B Q6_K directly
+./llama-launch stop         # Stop the running server
+./llama-launch status       # Check server status
+./llama-launch list         # List available models
+```
+
+Or with `uv run`:
+
+```bash
+uv run python llama-launch.py              # Interactive model selector
+uv run python llama-launch.py qwen3-35b-q6 # Launch directly
+uv run python llama-launch.py stop         # Stop the server
 ```
 
 ## Available Models
@@ -24,12 +32,28 @@ Launch and manage [llama-server](https://github.com/ggerganov/llama.cpp) instanc
 ## Architecture
 
 ```
-llama-launch.sh          # Launcher with model selector, stop, status
+llama-launch.py          # Python launcher (rich terminal UI)
+llama-launch             # Wrapper script (runs via uv)
+llama-launch.sh          # Legacy bash launcher (deprecated)
 models.json              # OpenAI-compatible model config for pi-coding-agent
 MODEL_TUNING.md          # Detailed parameter tuning rationale
 cache/                   # Downloaded GGUF models
 logs/                    # llama-server logs
 ```
+
+### Launcher Commands
+
+| Command | Description |
+|---------|-------------|
+| `./llama-launch` | Interactive model selector with table |
+| `./llama-launch <model-key>` | Launch a specific model |
+| `./llama-launch list` | Show all available models |
+| `./llama-launch status` | Check if server is running (PID, memory, port) |
+| `./llama-launch stop` | Graceful shutdown (force-kill after 10s timeout) |
+
+**Model keys:** `qwen3-35b-q6`, `qwen3-35b-q8`, `gemma4-31b-q8`, `gemma4-27b-q8`
+
+The launcher uses [rich](https://github.com/Textualize/rich) for beautiful terminal output — panels, tables, and styled prompts. Model parameters are loaded from TOML files in [launch_params/](launch_params/) (see [pyproject.toml](pyproject.toml) for dependencies).
 
 ## Integration with pi-coding-agent
 
@@ -51,6 +75,13 @@ Gemma 4 models download automatically on first launch. To download manually:
 huggingface-cli download unsloth/gemma-4-31b-it-GGUF \
   --include "*Q8_0*" \
   --local-dir /Users/erewok/llama/cache/
+```
+
+## Development
+
+```bash
+uv sync              # Install dependencies (rich)
+uv run python llama-launch.py  # Run with uv
 ```
 
 ## Troubleshooting
