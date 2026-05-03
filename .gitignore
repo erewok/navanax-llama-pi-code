@@ -3,3 +3,4 @@ cache/
 logs/
 .pi/
 models/
+__pycache__/

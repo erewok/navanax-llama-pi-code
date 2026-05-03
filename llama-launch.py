@@ -313,6 +313,9 @@ def cmd_download(model_key: str) -> None:
     except FileNotFoundError:
         console.print("[red]✗[/] 'llama-server' command not found. Is it installed?")
         sys.exit(1)
+    except KeyboardInterrupt:
+        console.print("\n[dim]Download interrupted.[/]")
+        sys.exit(130)
 
 
 def cmd_launch(model_key: str) -> None:
@@ -399,47 +402,21 @@ def cmd_launch(model_key: str) -> None:
         "--log-disable",
     ]
 
-    console.print()
-    console.print("[dim]Command:[/] " + " ".join(cmd))
-    console.print()
-
-    # Write PID file
-    # We'll use Popen so we can manage the process
+    # Write PID file before launching (llama-server writes its own PID)
+    # Use subprocess.run to keep the server in the foreground.
+    # Inheriting stdout/stderr/stdin lets llama-server talk to the terminal
+    # (like the bash script's `exec llama-server ...`), and Ctrl+C works
+    # naturally because the signal goes straight to the server process.
     try:
-        proc = subprocess.Popen(
-            cmd,
-            env=env,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        PID_FILE.write_text(str(proc.pid))
-
-        console.print(
-            Panel(
-                f"[bold]llama-server[/] is running on [cyan]http://{HOST}:{PORT}[/]\n"
-                f"PID: [bold]{proc.pid}[/]\n"
-                f"Log: [dim]{LOG_DIR / 'llama-server.log'}[/]",
-                title="[bold green]✓ Running[/]",
-                border_style="green",
-            )
-        )
-
-        # Wait for the process (so it stays alive)
-        proc.wait()
-
+        proc = subprocess.run(cmd, env=env)
     except FileNotFoundError:
         console.print("[red]✗[/] 'llama-server' command not found. Is it installed?")
         sys.exit(1)
     except KeyboardInterrupt:
-        console.print("\n[yellow]⚠[/] Interrupted. Stopping...")
-        try:
-            proc.terminate()
-            proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait()
+        console.print("\n[dim]Interrupted.[/]")
+        sys.exit(130)
+    finally:
         PID_FILE.unlink(missing_ok=True)
-        console.print("[green]✓[/] Stopped.")
 
 
 def cmd_select() -> None:
