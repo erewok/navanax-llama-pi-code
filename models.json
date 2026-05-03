@@ -1,0 +1,51 @@
+{
+  "providers": {
+    "llama-cpp": {
+      "baseUrl": "http://localhost:3333/v1",
+      "api": "openai-completions",
+      "apiKey": "none",
+      "compat": {
+        "supportsDeveloperRole": false,
+        "supportsReasoningEffort": false
+      },
+      "models": [
+        {
+          "id": "unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q6_K",
+          "name": "Qwen3.6 35B-A3B Q6_K (Local)",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 131072,
+          "maxTokens": 8192,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        },
+        {
+          "id": "unsloth/Qwen3.6-35B-A3B-GGUF:Q8_0",
+          "name": "Qwen3.6 35B-A3B Q8_0 (Local)",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 131072,
+          "maxTokens": 8192,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        },
+        {
+          "id": "unsloth/gemma-4-31b-it-GGUF:Q8_0",
+          "name": "Gemma 4 31B Q8_0 (Local)",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 131072,
+          "maxTokens": 8192,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        },
+        {
+          "id": "unsloth/gemma-4-27b-it-GGUF:Q8_0",
+          "name": "Gemma 4 27B A4B Q8_0 (Local)",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 131072,
+          "maxTokens": 8192,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        }
+      ]
+    }
+  }
+}
