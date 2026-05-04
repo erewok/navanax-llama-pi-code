@@ -1,25 +1,18 @@
 #!/usr/bin/env python3
 """
 llama-launch.py — Launch llama-server with model switching
-Optimized for MacBook Pro M5 Pro / 64GB
-
-MODELS:
-  qwen3-35b-q6    Qwen3.6 35B-A3B MoE, Q6_K (~25GB) — best balance
-  qwen3-35b-q8    Qwen3.6 35B-A3B MoE, Q8_0 (~37GB) — max quality
-  gemma4-31b-q8   Gemma 4 31B, Q8_0 (~35GB) — frontier quality, dense
-  gemma4-27b-q8   Gemma 4 27B A4B, Q8_0 (~28GB) — fast MoE, great for coding
+Models are loaded dynamically from TOML files in launch_params/
 
 USAGE:
   python llama-launch.py                 # interactive model selector
-  python llama-launch.py qwen3-35b-q6    # launch Qwen3 Q6
-  python llama-launch.py qwen3-35b-q8    # launch Qwen3 Q8
-  python llama-launch.py gemma4-31b-q8   # launch Gemma4 31B Q8
-  python llama-launch.py gemma4-27b-q8   # launch Gemma4 27B Q8
+  python llama-launch.py <model-key>     # launch model by TOML filename
   python llama-launch.py list            # show available models
   python llama-launch.py stop            # stop running llama-server
   python llama-launch.py status          # show current status
+  python llama-launch.py generate-models # regenerate models.json from TOMLs
 """
 
+import json
 import os
 import sys
 import signal
@@ -419,6 +412,47 @@ def cmd_launch(model_key: str) -> None:
         PID_FILE.unlink(missing_ok=True)
 
 
+def cmd_generate_models() -> None:
+    """Generate pi-models.json for pi-coding-agent from TOML configs."""
+    models_list = []
+    for key in sorted(MODELS):
+        m = MODELS[key]
+        models_list.append({
+            "id": m.hf_id,
+            "name": m.name,
+            "reasoning": m.reasoning,
+            "input": ["text"],
+            "contextWindow": m.context_window,
+            "maxTokens": m.max_tokens,
+            "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
+        })
+
+    models_json = {
+        "providers": {
+            "llama-cpp": {
+                "baseUrl": f"http://{HOST}:{PORT}/v1",
+                "api": "openai-completions",
+                "apiKey": "none",
+                "compat": {
+                    "supportsDeveloperRole": False,
+                    "supportsReasoningEffort": False,
+                },
+                "models": models_list,
+            }
+        }
+    }
+
+    out_path = LLAMA_DIR / "pi-models.json"
+    out_path.write_text(json.dumps(models_json, indent=2) + "\n")
+    console.print(
+        Panel(
+            f"[green]✓[/] Wrote [bold]{len(models_list)}[/] models to [cyan]{out_path}[/]",
+            title="[bold]pi-models.json[/]",
+            border_style="green",
+        )
+    )
+
+
 def cmd_select() -> None:
     """Interactive model selector."""
     if is_running():
@@ -437,7 +471,7 @@ def cmd_select() -> None:
     console.print()
     console.print(
         Panel(
-            "[bold]llama-launch.py[/] — llama-server launcher for M5 Pro / 64GB",
+            "[bold]llama-launch.py[/] — llama-server launcher",
             subtitle="[dim]Press Ctrl+C to exit[/]",
             border_style="cyan",
         )
@@ -490,19 +524,21 @@ def main() -> None:
     command = sys.argv[1].lower()
 
     match command:
-        case "qwen3-35b-q6" | "qwen3-35b-q8" | "gemma4-31b-q8" | "gemma4-27b-q8":
-            cmd_launch(command)
         case "stop":
             cmd_stop()
         case "status":
             cmd_status()
         case "list":
             cmd_list()
+        case "generate-models":
+            cmd_generate_models()
+        case key if key in MODELS:
+            cmd_launch(key)
         case _:
             console.print(
                 Panel(
                     f"Unknown command: [red]{command}[/]\n\n"
-                    f"Available: [cyan]stop, status, list[/]\n"
+                    f"Available: [cyan]stop, status, list, generate-models[/]\n"
                     f"Models: [cyan]{', '.join(sorted(MODELS.keys()))}[/]\n"
                     f"[dim]Run without arguments for interactive selector[/]",
                     title="[bold red]Error[/]",

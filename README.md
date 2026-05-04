@@ -1,89 +1,82 @@
-# llama — Local LLM Server for M5 Pro / 64GB
+# navanax-llama-pi-code
 
-Launch and manage [llama-server](https://github.com/ggerganov/llama.cpp) instances. Optimized for MacBook Pro M5 Pro with 64GB unified memory.
+Run local LLMs on your MacBook Pro using [llama.cpp](https://github.com/ggerganov/llama.cpp) and talk to them with [pi-coding-agent](https://github.com/mariozechner/pi-coding-agent). All models run entirely on-device via Apple Silicon's unified memory and Metal GPU — no cloud, no API keys.
 
-## Quick Start
+## Prerequisites
 
-```bash
-./llama-launch              # Interactive model selector
-./llama-launch qwen3-35b-q6 # Launch Qwen3.6 35B Q6_K directly
-./llama-launch stop         # Stop the running server
-./llama-launch status       # Check server status
-./llama-launch list         # List available models
-```
+- macOS on Apple Silicon (M1–M5)
+- [Homebrew](https://brew.sh)
+- [just](https://github.com/casey/just) (`brew install just`)
+- [uv](https://docs.astral.sh/uv/) (`brew install uv`)
 
-Or with `uv run`:
+## Setup
 
 ```bash
-uv run python llama-launch.py              # Interactive model selector
-uv run python llama-launch.py qwen3-35b-q6 # Launch directly
-uv run python llama-launch.py stop         # Stop the server
+# Install llama.cpp, Node.js, and pi-coding-agent
+just setup
+
+# Install Python dependencies
+just bootstrap
 ```
 
-## Available Models
-
-| Model | Quant | Size | Active Params | Speed | Best For |
-|-------|-------|------|---------------|-------|----------|
-| **Qwen3.6 35B-A3B** | Q6_K | ~25GB | 3B MoE | ~15-25 tok/s | Default — best balance |
-| **Qwen3.6 35B-A3B** | Q8_0 | ~37GB | 3B MoE | ~8-15 tok/s | Maximum quality |
-| **Gemma 4 31B** | Q8_0 | ~35GB | 31B dense | ~10-20 tok/s | Frontier reasoning |
-| **Gemma 4 27B A4B** | Q8_0 | ~28GB | ~4B MoE | ~20-35 tok/s | Fastest option |
-
-## Architecture
-
-```
-llama-launch.py          # Python launcher (rich terminal UI)
-llama-launch             # Wrapper script (runs via uv)
-llama-launch.sh          # Legacy bash launcher (deprecated)
-models.json              # OpenAI-compatible model config for pi-coding-agent
-MODEL_TUNING.md          # Detailed parameter tuning rationale
-cache/                   # Downloaded GGUF models
-logs/                    # llama-server logs
-```
-
-### Launcher Commands
-
-| Command | Description |
-|---------|-------------|
-| `./llama-launch` | Interactive model selector with table |
-| `./llama-launch <model-key>` | Launch a specific model |
-| `./llama-launch list` | Show all available models |
-| `./llama-launch status` | Check if server is running (PID, memory, port) |
-| `./llama-launch stop` | Graceful shutdown (force-kill after 10s timeout) |
-
-**Model keys:** `qwen3-35b-q6`, `qwen3-35b-q8`, `gemma4-31b-q8`, `gemma4-27b-q8`
-
-The launcher uses [rich](https://github.com/Textualize/rich) for beautiful terminal output — panels, tables, and styled prompts. Model parameters are loaded from TOML files in [launch_params/](launch_params/) (see [pyproject.toml](pyproject.toml) for dependencies).
-
-## Integration with pi-coding-agent
-
-After launching a model, run `pi` in your project and select the local provider. `models.json` is pre-configured with all four models at `http://localhost:3333/v1`.
-
-## Hardware Notes
-
-- **Threads:** 10 (performance cores only, leaves efficiency cores for macOS)
-- **GPU:** Full offload (`-ngl 99`) via Metal
-- **Context:** 128k tokens with q8_0 KV cache precision
-- **Flash Attention:** Enabled for long-context performance
-- **Memory lock:** Model pinned in RAM to prevent swapping
-
-## Gemma 4 Setup
-
-Gemma 4 models download automatically on first launch. To download manually:
+## Usage
 
 ```bash
-huggingface-cli download unsloth/gemma-4-31b-it-GGUF \
-  --include "*Q8_0*" \
-  --local-dir /Users/erewok/llama/cache/
+just run                        # Interactive model selector
+just launch qwen35-122b-q6     # Launch a specific model
+just stop                       # Stop the running server
+just status                     # Check if server is running
+just list                       # List available models
+just logs                       # Tail the server log
+just generate-models            # Rebuild pi-models.json from TOML configs
 ```
 
-## Development
+Once the server is running, open another terminal in your project directory and run `pi`. Select the local model when prompted.
 
-```bash
-uv sync              # Install dependencies (rich)
-uv run python llama-launch.py  # Run with uv
+## How It Works
+
+Models are defined as TOML files in [`launch_params/`](launch_params/). Each file specifies the HuggingFace repo, quantization, and launch parameters tuned for a specific hardware profile. Drop a new TOML file in that directory and it's automatically available.
+
+```
+launch_params/           # Model configs (one TOML per model)
+llama-launch.py          # Python launcher with rich terminal UI
+pi-models.json           # Generated config for pi-coding-agent
+bootstrap.sh             # One-time system setup script
+justfile                 # Task runner recipes
+cache/                   # Downloaded GGUF models (git-ignored)
+logs/                    # Server logs (git-ignored)
 ```
 
-## Troubleshooting
+The launcher downloads models on first run via `llama-server -hf`, caches them locally, and starts the server with the parameters from the TOML config.
 
-See [MODEL_TUNING.md](MODEL_TUNING.md) for detailed troubleshooting, parameter tuning, and compaction settings.
+## Adding a New Model
+
+Create a TOML file in `launch_params/`:
+
+```toml
+[hf]
+repo = "unsloth/Some-Model-GGUF"
+tag  = "Q6_K"
+
+[meta]
+name    = "Some Model Q6_K (Local)"
+quant   = "Q6_K"
+size_gb = 40
+moe     = true
+active_params_b = 10
+
+[launch]
+threads        = 12
+batch          = 768
+ubatch         = 192
+context        = 131072
+kv_cache_k     = "q8_0"
+kv_cache_v     = "q8_0"
+reasoning      = true
+max_tokens     = 8192
+context_window = 131072
+```
+
+Then run `just generate-models` to update `pi-models.json`.
+
+See [model-tuning.md](model-tuning.md) for what each parameter means and recommended defaults for different Mac configurations.

@@ -1,0 +1,25 @@
+# Qwen3.5 122B-A10B MoE — Q6_K (~80GB)
+# 122B total params, ~10B active per token — fast inference, high quality.
+# M3 Max 128GB: 256k context with q8_0 KV cache (~110GB total).
+
+[hf]
+repo = "unsloth/Qwen3.5-122B-A10B-GGUF"
+tag  = "Q6_K"
+
+[meta]
+name    = "Qwen3.5 122B-A10B Q6_K (Local)"
+quant   = "Q6_K"
+size_gb = 80
+moe     = true
+active_params_b = 10
+
+[launch]
+threads        = 12
+batch          = 768
+ubatch         = 192
+context        = 262144
+kv_cache_k     = "q8_0"
+kv_cache_v     = "q8_0"
+reasoning      = true
+max_tokens     = 8192
+context_window = 262144
