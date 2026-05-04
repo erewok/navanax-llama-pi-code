@@ -12,21 +12,35 @@ Run local LLMs on your MacBook Pro using [llama.cpp](https://github.com/ggergano
 ## Setup
 
 ```bash
-# Install llama.cpp, Node.js, and pi-coding-agent
+# Install llama.cpp, Node.js, and pi-coding-agent and then load deps for this python program
 just setup
-
-# Install Python dependencies
-just bootstrap
 ```
+
+## Quick Start
+
+After setup, pick the models that fit your machine and disable the rest:
+
+```bash
+just list                           # See all models with sizes
+just disable qwen35-122b-q6        # Too big? Disable it
+just disable qwen3-35b-bf16        # Don't need full precision? Disable it
+just run                            # Launch — only enabled models appear
+```
+
+This creates a `user-config.toml` (git-ignored) that remembers your choices. You only need to do this once — your selections persist across sessions. To re-enable a model later, run `just enable <key>`.
+
+If you skip this step, all models are enabled by default. See [model-tuning.md](model-tuning.md) for which models fit your hardware.
 
 ## Usage
 
 ```bash
 just run                        # Interactive model selector
-just launch qwen35-122b-q6     # Launch a specific model
+just launch qwen3-35b-q8       # Launch a specific model
 just stop                       # Stop the running server
 just status                     # Check if server is running
-just list                       # List available models
+just list                       # List all models (enabled and disabled)
+just enable <model>             # Enable a model
+just disable <model>            # Disable a model
 just logs                       # Tail the server log
 just generate-pi-models         # Rebuild pi-models.json from TOML configs
 ```
@@ -39,9 +53,11 @@ Models are defined as TOML files in [`launch_params/`](launch_params/). Each fil
 
 ```
 launch_params/           # Model configs (one TOML per model)
+user-config.sample.toml  # Sample per-machine model selection
+user-config.toml         # Your enabled/disabled models (git-ignored, auto-created)
 llama-launch.py          # Python launcher with rich terminal UI
 pi-models.json           # Generated config for pi-coding-agent
-bootstrap.sh             # One-time system setup script
+setup.sh                 # One-time system setup script
 justfile                 # Task runner recipes
 cache/                   # Downloaded GGUF models (git-ignored)
 logs/                    # Server logs (git-ignored)

@@ -10,6 +10,8 @@ USAGE:
   python llama-launch.py stop            # stop running llama-server
   python llama-launch.py status          # show current status
   python llama-launch.py generate-models # regenerate models.json from TOMLs
+  python llama-launch.py enable <key>    # enable a model
+  python llama-launch.py disable <key>   # disable a model
 """
 
 import json
@@ -36,6 +38,8 @@ PID_FILE = LLAMA_DIR / "llama-server.pid"
 PORT = 3333
 HOST = "127.0.0.1"
 PARAMS_DIR = LLAMA_DIR / "launch_params"
+USER_CONFIG = LLAMA_DIR / "user-config.toml"
+USER_CONFIG_SAMPLE = LLAMA_DIR / "user-config.sample.toml"
 
 # Ensure directories exist
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
@@ -55,6 +59,7 @@ class Model:
     size_gb: int
     moe: bool
     active_params_b: int
+    enabled: bool = True
     threads: int = 10
     batch: int = 1024
     ubatch: int = 256
@@ -71,11 +76,22 @@ class Model:
         return f"{self.hf_repo}:{self.hf_tag}"
 
 
-def load_models() -> dict[str, Model]:
-    """Load all models from TOML files in launch_params/."""
+def _load_user_config() -> dict[str, bool] | None:
+    """Load enabled/disabled state from user-config.toml. Returns None if no file."""
+    if not USER_CONFIG.exists():
+        return None
+    with open(USER_CONFIG, "rb") as f:
+        data = tomllib.load(f)
+    return {key: section.get("enabled", True) for key, section in data.items()}
+
+
+def load_all_models() -> dict[str, Model]:
+    """Load all models from TOML files in launch_params/, with user-config applied."""
     models: dict[str, Model] = {}
     if not PARAMS_DIR.is_dir():
         return models
+
+    user_config = _load_user_config()
 
     for toml_file in sorted(PARAMS_DIR.glob("*.toml")):
         key = toml_file.stem  # e.g. "qwen3-35b-q6"
@@ -86,6 +102,8 @@ def load_models() -> dict[str, Model]:
         meta = data["meta"]
         launch = data["launch"]
 
+        enabled = user_config[key] if user_config and key in user_config else True
+
         models[key] = Model(
             hf_repo=hf["repo"],
             hf_tag=hf["tag"],
@@ -94,6 +112,7 @@ def load_models() -> dict[str, Model]:
             size_gb=meta["size_gb"],
             moe=meta["moe"],
             active_params_b=meta["active_params_b"],
+            enabled=enabled,
             threads=launch["threads"],
             batch=launch["batch"],
             ubatch=launch["ubatch"],
@@ -108,14 +127,15 @@ def load_models() -> dict[str, Model]:
     return models
 
 
-MODELS = load_models()
+ALL_MODELS = load_all_models()
+MODELS = {k: m for k, m in ALL_MODELS.items() if m.enabled}
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
 def _manifest_file(model_key: str) -> Path:
     """Return the manifest file path for a model."""
-    hf_id = MODELS[model_key].hf_id
+    hf_id = ALL_MODELS[model_key].hf_id
     safe_name = hf_id.replace("/", "=").replace(":", "=")
     return CACHE_DIR / f"manifest={safe_name}.json"
 
@@ -245,30 +265,44 @@ def cmd_status() -> None:
 
 
 def cmd_list() -> None:
-    """List all available models."""
-    table = Table(title="[bold]Available Models[/]", show_header=True, header_style="bold cyan")
+    """List all models, showing enabled/disabled status."""
+    table = Table(title="[bold]All Models[/]", show_header=True, header_style="bold cyan")
     table.add_column("#", style="dim", width=3)
-    table.add_column("Key", style="cyan", width=18)
-    table.add_column("Description", style="white", min_width=30)
+    table.add_column("Key", width=18)
+    table.add_column("Description", min_width=30)
     table.add_column("Quant", style="dim", width=8)
     table.add_column("Size", style="dim", width=8)
+    table.add_column("Enabled", width=7)
     table.add_column("Local", width=5)
 
-    for i, (key, model) in enumerate(sorted(MODELS.items()), 1):
+    for i, (key, model) in enumerate(sorted(ALL_MODELS.items()), 1):
         downloaded = _manifest_file(key).exists()
+        key_style = "cyan" if model.enabled else "dim"
+        desc_style = "white" if model.enabled else "dim"
         table.add_row(
             str(i),
-            key,
-            model.name,
+            f"[{key_style}]{key}[/]",
+            f"[{desc_style}]{model.name}[/]",
             model.quant,
             f"~{model.size_gb}GB",
+            "[green]yes[/]" if model.enabled else "[red]no[/]",
             "[green]✓[/]" if downloaded else "[dim]—[/]",
         )
 
     console.print(table)
+
+    has_config = USER_CONFIG.exists()
+    if has_config:
+        console.print(f"\n[dim]Config: {USER_CONFIG}[/]")
+    else:
+        console.print(
+            f"\n[dim]No user-config.toml found — all models enabled.[/]\n"
+            f"[dim]Copy the sample to get started: cp user-config.sample.toml user-config.toml[/]"
+        )
+
     console.print(
-        "\n[dim]Usage: python llama-launch.py <model-key>[/]\n"
-        "[dim]       python llama-launch.py          # interactive selector[/]"
+        "[dim]Usage: python llama-launch.py <model-key>[/]\n"
+        "[dim]       python llama-launch.py enable/disable <key>[/]"
     )
 
 
@@ -462,6 +496,75 @@ def cmd_generate_models() -> None:
     )
 
 
+def _write_user_config(enabled_map: dict[str, bool]) -> None:
+    """Write user-config.toml with current enabled/disabled state."""
+    lines = [
+        "# user-config.toml — Per-machine model selection",
+        "#",
+        "# Set enabled = true for models you want to use, false to hide them.",
+        "# Disabled models won't appear in the launcher, won't download, and",
+        "# won't be included in pi-models.json.",
+        "#",
+        "# See model-tuning.md for guidance on which models fit your hardware.",
+        "",
+    ]
+    for key in sorted(ALL_MODELS):
+        m = ALL_MODELS[key]
+        enabled = enabled_map.get(key, True)
+        moe_label = f"MoE ({m.active_params_b}B active)" if m.moe else f"dense ({m.active_params_b}B active)"
+        lines.append(f"[{key}]  # {m.name} — ~{m.size_gb}GB, {moe_label}")
+        lines.append(f"enabled = {'true' if enabled else 'false'}")
+        lines.append("")
+
+    USER_CONFIG.write_text("\n".join(lines))
+
+
+def _ensure_user_config() -> dict[str, bool]:
+    """Load user-config.toml, creating it from current state if it doesn't exist."""
+    if USER_CONFIG.exists():
+        config = _load_user_config()
+        if config is not None:
+            return config
+    # Generate from ALL_MODELS — everything enabled by default
+    enabled_map = {key: m.enabled for key, m in ALL_MODELS.items()}
+    _write_user_config(enabled_map)
+    return enabled_map
+
+
+def cmd_enable(model_key: str) -> None:
+    """Enable a model in user-config.toml."""
+    if model_key not in ALL_MODELS:
+        console.print(f"[red]Unknown model:[/] {model_key}")
+        console.print(f"[dim]Available: {', '.join(sorted(ALL_MODELS.keys()))}[/]")
+        sys.exit(1)
+
+    enabled_map = _ensure_user_config()
+    if enabled_map.get(model_key, True):
+        console.print(f"[green]✓[/] [cyan]{model_key}[/] is already enabled.")
+        return
+
+    enabled_map[model_key] = True
+    _write_user_config(enabled_map)
+    console.print(f"[green]✓[/] Enabled [cyan]{model_key}[/]")
+
+
+def cmd_disable(model_key: str) -> None:
+    """Disable a model in user-config.toml."""
+    if model_key not in ALL_MODELS:
+        console.print(f"[red]Unknown model:[/] {model_key}")
+        console.print(f"[dim]Available: {', '.join(sorted(ALL_MODELS.keys()))}[/]")
+        sys.exit(1)
+
+    enabled_map = _ensure_user_config()
+    if not enabled_map.get(model_key, True):
+        console.print(f"[yellow]✓[/] [cyan]{model_key}[/] is already disabled.")
+        return
+
+    enabled_map[model_key] = False
+    _write_user_config(enabled_map)
+    console.print(f"[yellow]✓[/] Disabled [cyan]{model_key}[/]")
+
+
 def cmd_select() -> None:
     """Interactive model selector."""
     if is_running():
@@ -541,13 +644,34 @@ def main() -> None:
             cmd_list()
         case "generate-models":
             cmd_generate_models()
+        case "enable":
+            if len(sys.argv) < 3:
+                console.print("[red]Usage:[/] python llama-launch.py enable <model-key>")
+                sys.exit(1)
+            cmd_enable(sys.argv[2])
+        case "disable":
+            if len(sys.argv) < 3:
+                console.print("[red]Usage:[/] python llama-launch.py disable <model-key>")
+                sys.exit(1)
+            cmd_disable(sys.argv[2])
         case key if key in MODELS:
             cmd_launch(key)
+        case key if key in ALL_MODELS:
+            console.print(
+                Panel(
+                    f"[yellow]{key}[/] is disabled.\n\n"
+                    f"Enable it first:\n"
+                    f"  [bold]python llama-launch.py enable {key}[/]",
+                    title="[bold yellow]Disabled Model[/]",
+                    border_style="yellow",
+                )
+            )
+            sys.exit(1)
         case _:
             console.print(
                 Panel(
                     f"Unknown command: [red]{command}[/]\n\n"
-                    f"Available: [cyan]stop, status, list, generate-models[/]\n"
+                    f"Available: [cyan]stop, status, list, generate-models, enable, disable[/]\n"
                     f"Models: [cyan]{', '.join(sorted(MODELS.keys()))}[/]\n"
                     f"[dim]Run without arguments for interactive selector[/]",
                     title="[bold red]Error[/]",

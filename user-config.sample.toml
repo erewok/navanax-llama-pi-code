@@ -1,0 +1,34 @@
+# user-config.toml — Per-machine model selection
+#
+# This file controls which models are available on YOUR machine.
+# Copy this sample to get started:
+#
+#   cp user-config.sample.toml user-config.toml
+#
+# Set enabled = true for models you want to use, false to hide them.
+# Disabled models won't appear in the launcher, won't download, and
+# won't be included in pi-models.json.
+#
+# If this file doesn't exist, ALL models in launch_params/ are enabled.
+# If a model in launch_params/ isn't listed here, it defaults to enabled.
+#
+# Tip: Only enable models that fit in your machine's memory. See
+# model-tuning.md for guidance on which models work with your hardware.
+
+[gemma4-27b-q8]       # Gemma 4 27B A4B Q8_0 — ~28GB, MoE (4B active)
+enabled = true
+
+[gemma4-31b-q8]       # Gemma 4 31B Q8_0 — ~35GB, dense (31B active)
+enabled = true
+
+[qwen3-35b-bf16]      # Qwen3.6 35B-A3B BF16 — ~70GB, MoE (3B active)
+enabled = true
+
+[qwen3-35b-q6]        # Qwen3.6 35B-A3B Q6_K — ~25GB, MoE (3B active)
+enabled = true
+
+[qwen3-35b-q8]        # Qwen3.6 35B-A3B Q8_0 — ~37GB, MoE (3B active)
+enabled = true
+
+[qwen35-122b-q6]      # Qwen3.5 122B-A10B Q6_K — ~80GB, MoE (10B active)
+enabled = true

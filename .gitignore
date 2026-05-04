@@ -5,3 +5,4 @@ logs/
 models/
 __pycache__/
 pi-models.json
+user-config.toml

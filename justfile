@@ -35,6 +35,14 @@ status:
 generate-pi-models:
     uv run python llama-launch.py generate-models
 
+# Enable a model (e.g. just enable qwen3-35b-q8)
+enable model:
+    uv run python llama-launch.py enable {{model}}
+
+# Disable a model (e.g. just disable qwen35-122b-q6)
+disable model:
+    uv run python llama-launch.py disable {{model}}
+
 # Tail the llama-server log
 logs:
     tail -f logs/llama-server.log
@@ -42,3 +50,4 @@ logs:
 # Run the full setup script (installs llama.cpp, pi-coding-agent, etc.)
 setup:
     bash setup.sh
+    just bootstrap

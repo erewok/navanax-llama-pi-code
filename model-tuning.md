@@ -175,6 +175,28 @@ These are set by the launcher and generally don't need per-model tuning:
 | `--poll 100` | Always | Maximum Metal polling frequency (reduces latency). |
 | `--poll-batch 1` | Always | Minimal batch polling overhead. |
 
+## Monitoring GPU and RAM Usage
+
+Keeping an eye on memory pressure and GPU utilization helps you know whether your model fits comfortably or is thrashing swap.
+
+### System Monitoring (CPU + RAM)
+
+- **btop** — Rich terminal UI with CPU, RAM, disk, and network. Install with `brew install btop`.
+- **htop** — Lightweight alternative. Install with `brew install htop`.
+
+Either will show you unified memory pressure and whether swap is active, which is the first sign your model config is too large.
+
+### GPU Monitoring
+
+On Apple Silicon, the GPU shares unified memory with the CPU, so standard NVIDIA tools like `nvidia-smi` don't apply. Instead:
+
+- **macmon** — Terminal-based Apple Silicon monitor that shows GPU utilization, power draw, and memory. Install with `brew install macmon`.
+- **Activity Monitor** (built-in) — Open Activity Monitor → GPU History (Window → GPU History) to see real-time GPU usage per process. The Memory tab also shows memory pressure.
+
+Pick whichever fits your workflow — `macmon` if you prefer the terminal, Activity Monitor if you prefer a GUI.
+
+> **Note:** On Linux with NVIDIA GPUs, use **nvtop** (`apt install nvtop` or `brew install nvtop`) for real-time GPU/VRAM monitoring.
+
 ## Troubleshooting
 
 **Slow performance / memory pressure:** Your model + KV cache exceeds available RAM. Switch to a smaller model, reduce context, or use more aggressive KV cache quantization.
