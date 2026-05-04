@@ -82,7 +82,16 @@ def _load_user_config() -> dict[str, bool] | None:
         return None
     with open(USER_CONFIG, "rb") as f:
         data = tomllib.load(f)
-    return {key: section.get("enabled", True) for key, section in data.items()}
+    return {key: section.get("enabled", True) for key, section in data.items() if key != "launcher"}
+
+
+def _load_default_model() -> str | None:
+    """Load the default model key from the [launcher] section of user-config.toml."""
+    if not USER_CONFIG.exists():
+        return None
+    with open(USER_CONFIG, "rb") as f:
+        data = tomllib.load(f)
+    return data.get("launcher", {}).get("default", None)
 
 
 def load_all_models() -> dict[str, Model]:
@@ -497,7 +506,9 @@ def cmd_generate_models() -> None:
 
 
 def _write_user_config(enabled_map: dict[str, bool]) -> None:
-    """Write user-config.toml with current enabled/disabled state."""
+    """Write user-config.toml with current enabled/disabled state, preserving [launcher] settings."""
+    default_model = _load_default_model()
+
     lines = [
         "# user-config.toml — Per-machine model selection",
         "#",
@@ -508,6 +519,13 @@ def _write_user_config(enabled_map: dict[str, bool]) -> None:
         "# See model-tuning.md for guidance on which models fit your hardware.",
         "",
     ]
+
+    if default_model:
+        lines += [
+            "[launcher]",
+            f'default = "{default_model}"',
+            "",
+        ]
     for key in sorted(ALL_MODELS):
         m = ALL_MODELS[key]
         enabled = enabled_map.get(key, True)
@@ -589,6 +607,10 @@ def cmd_select() -> None:
         )
     )
 
+    default_key = _load_default_model()
+    if default_key and default_key not in MODELS:
+        default_key = None
+
     # Model table
     table = Table(show_header=False, box=None, padding=(0, 1))
     table.add_column("#", style="dim", width=3)
@@ -596,11 +618,19 @@ def cmd_select() -> None:
     table.add_column("Description", style="white")
 
     sorted_keys = sorted(MODELS.keys())
+    default_num = None
     for i, key in enumerate(sorted_keys, 1):
-        table.add_row(str(i), key, MODELS[key].name)
+        is_default = key == default_key
+        if is_default:
+            default_num = i
+        key_str = f"[bold cyan]{key} *[/]" if is_default else key
+        desc_str = f"[bold white]{MODELS[key].name}[/]" if is_default else MODELS[key].name
+        table.add_row(str(i), key_str, desc_str)
 
     console.print(table)
     console.print()
+
+    prompt_default = str(default_num) if default_num else "q"
 
     # Prompt
     while True:
@@ -608,7 +638,7 @@ def cmd_select() -> None:
             choice = Prompt.ask(
                 "[bold]Choose[/]",
                 choices=[str(i) for i in range(1, len(sorted_keys) + 1)] + ["q"],
-                default="q",
+                default=prompt_default,
             )
         except (KeyboardInterrupt, EOFError):
             console.print("\n[dim]Goodbye.[/]")

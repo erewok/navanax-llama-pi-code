@@ -15,6 +15,12 @@
 # Tip: Only enable models that fit in your machine's memory. See
 # model-tuning.md for guidance on which models work with your hardware.
 
+# [launcher] — optional launcher settings
+# default: pre-select this model in the interactive selector (just run)
+#
+# [launcher]
+# default = "qwen3-35b-q8"
+
 [gemma4-27b-q8]       # Gemma 4 27B A4B Q8_0 — ~28GB, MoE (4B active)
 enabled = true
 
