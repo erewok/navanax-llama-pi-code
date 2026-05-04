@@ -32,7 +32,7 @@ status:
     uv run python llama-launch.py status
 
 # Regenerate pi-models.json from TOML configs
-generate-models:
+generate-pi-models:
     uv run python llama-launch.py generate-models
 
 # Tail the llama-server log

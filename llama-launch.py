@@ -286,25 +286,25 @@ def cmd_download(model_key: str) -> None:
         )
     )
 
-    # llama-server with --hf downloads the model then exits
+    # Use llama-cli to download the model — it fetches the GGUF and exits
     dl_env = os.environ.copy()
     dl_env["LLAMA_CACHE"] = str(CACHE_DIR)
 
     try:
         proc = subprocess.run(
             [
-                "llama-server",
+                "llama-cli",
                 "-hf", model.hf_id,
-                "--host", HOST,
-                "--port", str(PORT + 1),
-                "--no-hang",
+                "-c", "1",
+                "-n", "0",
+                "-p", "",
             ],
             env=dl_env,
-            capture_output=False,
+            capture_output=True,
         )
         console.print(Panel("[green]✓[/] Download complete.", border_style="green"))
     except FileNotFoundError:
-        console.print("[red]✗[/] 'llama-server' command not found. Is it installed?")
+        console.print("[red]✗[/] 'llama-cli' command not found. Is llama.cpp installed?")
         sys.exit(1)
     except KeyboardInterrupt:
         console.print("\n[dim]Download interrupted.[/]")
@@ -444,9 +444,15 @@ def cmd_generate_models() -> None:
 
     out_path = LLAMA_DIR / "pi-models.json"
     out_path.write_text(json.dumps(models_json, indent=2) + "\n")
+
+    pi_dest = Path.home() / ".pi" / "agent" / "models.json"
     console.print(
         Panel(
-            f"[green]✓[/] Wrote [bold]{len(models_list)}[/] models to [cyan]{out_path}[/]",
+            f"[green]✓[/] Wrote [bold]{len(models_list)}[/] models to [cyan]{out_path}[/]\n\n"
+            f"To use with pi-coding-agent, copy it to your pi config directory:\n\n"
+            f"  [bold]mkdir -p ~/.pi/agent[/]\n"
+            f"  [bold]cp {out_path} {pi_dest}[/]\n\n"
+            f"[dim]pi-coding-agent reads models from {pi_dest} at startup.[/]",
             title="[bold]pi-models.json[/]",
             border_style="green",
         )

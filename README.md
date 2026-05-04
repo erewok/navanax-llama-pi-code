@@ -28,7 +28,7 @@ just stop                       # Stop the running server
 just status                     # Check if server is running
 just list                       # List available models
 just logs                       # Tail the server log
-just generate-models            # Rebuild pi-models.json from TOML configs
+just generate-pi-models         # Rebuild pi-models.json from TOML configs
 ```
 
 Once the server is running, open another terminal in your project directory and run `pi`. Select the local model when prompted.

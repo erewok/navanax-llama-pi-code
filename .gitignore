@@ -4,3 +4,4 @@ logs/
 .pi/
 models/
 __pycache__/
+pi-models.json
