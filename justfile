@@ -47,7 +47,6 @@ disable model:
 logs:
     tail -f logs/llama-server.log
 
-# Run the full setup script (installs llama.cpp, pi-coding-agent, etc.)
+# Run the full setup script (installs tools, Python env, etc.)
 setup:
     bash setup.sh
-    just bootstrap
