@@ -20,5 +20,5 @@ context       = 131072
 kv_cache_k    = "q8_0"
 kv_cache_v    = "q8_0"
 reasoning     = true
-max_tokens    = 8192
+max_tokens    = 32768
 context_window = 131072
