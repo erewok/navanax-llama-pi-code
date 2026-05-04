@@ -1,0 +1,25 @@
+# Qwen3.6 35B-A3B MoE — BF16 (~70GB)
+# Full precision, no quantization. Best quality, highest memory usage.
+# M3 Max 128GB: 70GB model + ~15GB KV (q8_0 @ 256k) + ~10GB OS = ~95GB
+
+[hf]
+repo = "unsloth/Qwen3.6-35B-A3B-GGUF"
+tag  = "BF16"
+
+[meta]
+name    = "Qwen3.6 35B-A3B BF16 (Local)"
+quant   = "BF16"
+size_gb = 70
+moe     = true
+active_params_b = 3
+
+[launch]
+threads        = 12
+batch          = 1024
+ubatch         = 256
+context        = 262144
+kv_cache_k     = "q8_0"
+kv_cache_v     = "q8_0"
+reasoning      = true
+max_tokens     = 8192
+context_window = 262144

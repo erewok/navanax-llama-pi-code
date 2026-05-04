@@ -39,6 +39,6 @@ generate-pi-models:
 logs:
     tail -f logs/llama-server.log
 
-# Run the full bootstrap script (installs llama.cpp, pi-coding-agent, etc.)
+# Run the full setup script (installs llama.cpp, pi-coding-agent, etc.)
 setup:
-    bash bootstrap.sh
+    bash setup.sh

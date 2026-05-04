@@ -252,14 +252,17 @@ def cmd_list() -> None:
     table.add_column("Description", style="white", min_width=30)
     table.add_column("Quant", style="dim", width=8)
     table.add_column("Size", style="dim", width=8)
+    table.add_column("Local", width=5)
 
     for i, (key, model) in enumerate(sorted(MODELS.items()), 1):
+        downloaded = _manifest_file(key).exists()
         table.add_row(
             str(i),
             key,
             model.name,
             model.quant,
             f"~{model.size_gb}GB",
+            "[green]✓[/]" if downloaded else "[dim]—[/]",
         )
 
     console.print(table)
