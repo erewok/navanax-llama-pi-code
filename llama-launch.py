@@ -170,6 +170,7 @@ def get_pid() -> int | None:
     try:
         return int(PID_FILE.read_text().strip())
     except ValueError:
+        console.print("[red]✗[/] Invalid PID file content. Recommend deleting the PID file.")
         return None
 
 
@@ -210,6 +211,10 @@ def cmd_stop() -> None:
             border_style="yellow",
         )
     )
+    if pid is None:
+        console.print("[red]✗[/] Could not read PID file. Deleting PID file and exiting.")
+        PID_FILE.unlink(missing_ok=True)
+        return
 
     # Graceful shutdown
     try:
@@ -243,6 +248,10 @@ def cmd_status() -> None:
     """Show current status of llama-server."""
     if is_running():
         pid = get_pid()
+        if pid is None:
+            console.print("[red]✗[/] Could not read PID file. Status unknown.")
+            return
+
         mem = get_memory_usage(pid)
 
         table = Table(show_header=False, box=None, padding=(0, 1))
@@ -305,8 +314,8 @@ def cmd_list() -> None:
         console.print(f"\n[dim]Config: {USER_CONFIG}[/]")
     else:
         console.print(
-            f"\n[dim]No user-config.toml found — all models enabled.[/]\n"
-            f"[dim]Copy the sample to get started: cp user-config.sample.toml user-config.toml[/]"
+            "\n[dim]No user-config.toml found — all models enabled.[/]\n"
+            "[dim]Copy the sample to get started: cp user-config.sample.toml user-config.toml[/]"
         )
 
     console.print(
@@ -337,7 +346,7 @@ def cmd_download(model_key: str) -> None:
     dl_env["LLAMA_CACHE"] = str(CACHE_DIR)
 
     try:
-        proc = subprocess.run(
+        _proc = subprocess.run(
             [
                 "llama-cli",
                 "-hf", model.hf_id,
@@ -447,7 +456,7 @@ def cmd_launch(model_key: str) -> None:
     # (like the bash script's `exec llama-server ...`), and Ctrl+C works
     # naturally because the signal goes straight to the server process.
     try:
-        proc = subprocess.run(cmd, env=env)
+        _proc = subprocess.run(cmd, env=env)
     except FileNotFoundError:
         console.print("[red]✗[/] 'llama-server' command not found. Is it installed?")
         sys.exit(1)
