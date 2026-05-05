@@ -188,14 +188,15 @@ Either will show you unified memory pressure and whether swap is active, which i
 
 ### GPU Monitoring
 
-On Apple Silicon, the GPU shares unified memory with the CPU, so standard NVIDIA tools like `nvidia-smi` don't apply. Instead:
+On Apple Silicon, the GPU shares unified memory with the CPU, so standard NVIDIA tools like `nvidia-smi` don't apply.
 
+You can try the following instead:
+
+- **Activity Monitor** (built-in; no install required) — Open Activity Monitor → GPU History (Window → GPU History) to see real-time GPU usage per process. The Memory tab also shows memory pressure.
 - **macmon** — Terminal-based Apple Silicon monitor that shows GPU utilization, power draw, and memory. Install with `brew install macmon`.
-- **Activity Monitor** (built-in) — Open Activity Monitor → GPU History (Window → GPU History) to see real-time GPU usage per process. The Memory tab also shows memory pressure.
+- **nvtop** - I found that it works okay and the graphs look good but they report it may be buggy. Install with `brew install nvtop`.
 
-Pick whichever fits your workflow — `macmon` if you prefer the terminal, Activity Monitor if you prefer a GUI.
-
-> **Note:** On Linux with NVIDIA GPUs, use **nvtop** (`apt install nvtop` or `brew install nvtop`) for real-time GPU/VRAM monitoring.
+> **Note:** On Linux with NVIDIA GPUs, use **nvtop** (`apt install nvtop`) for real-time GPU/VRAM monitoring.
 
 ## Troubleshooting
 

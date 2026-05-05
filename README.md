@@ -1,13 +1,23 @@
 # navanax-llama-pi-code
 
-Run local LLMs on your MacBook Pro using [llama.cpp](https://github.com/ggerganov/llama.cpp) and talk to them with [pi-coding-agent](https://github.com/mariozechner/pi-coding-agent). All models run entirely on-device via Apple Silicon's unified memory and Metal GPU — no cloud, no API keys.
+I made this so that I could more easily run local LLMs on my MacBook Pros using [llama.cpp](https://github.com/ggerganov/llama.cpp) and talk to them with [pi-coding-agent](https://github.com/mariozechner/pi-coding-agent).
 
-## Prerequisites
+All models run entirely on-device via Apple Silicon's unified memory and Metal GPU: no cloud and no API keys required.
+
+## Prerequisites for The Python Program
 
 - macOS on Apple Silicon (M1–M5)
 - [Homebrew](https://brew.sh)
 - [just](https://github.com/casey/just) (`brew install just`)
 - [uv](https://docs.astral.sh/uv/) (`brew install uv`)
+
+## Llama.cpp and pi-code Prerequisites
+
+I made a [`setup.sh`](./setup.sh) script to start running local models, and it will install the following:
+
+- llama.cpp (via homebrew)
+- pi-coding-agent (via npm)
+- tintinweb/pi-subagents (via npm)
 
 ## Setup
 
@@ -21,13 +31,12 @@ just setup
 After setup, pick the models that fit your machine and disable the rest:
 
 ```bash
-just list                           # See all models with sizes
-just disable qwen35-122b-q6        # Too big? Disable it
-just disable qwen3-35b-bf16        # Don't need full precision? Disable it
-just run                            # Launch — only enabled models appear
+just list                         # See all models with sizes
+just disable qwen35-122b-q6       # Too big? Disable it
+just run                          # Launch — only enabled models appear
 ```
 
-This creates a `user-config.toml` (git-ignored) that remembers your choices. You only need to do this once — your selections persist across sessions. To re-enable a model later, run `just enable <key>`.
+Enabling or disabling for the first time creates a `user-config.toml` (git-ignored) that remembers your choices. You only need to do this once — your selections persist across sessions. To re-enable a model later, run `just enable <key>`.
 
 If you skip this step, all models are enabled by default. See [model-tuning.md](model-tuning.md) for which models fit your hardware.
 
@@ -49,7 +58,7 @@ Once the server is running, open another terminal in your project directory and 
 
 ## How It Works
 
-Models are defined as TOML files in [`launch_params/`](launch_params/). Each file specifies the HuggingFace repo, quantization, and launch parameters tuned for a specific hardware profile. Drop a new TOML file in that directory and it's automatically available.
+Models are defined as TOML files in [`launch_params/`](launch_params/). Each file specifies the HuggingFace repo, quantization, and launch parameters tuned for a specific hardware profile. Add a new TOML file to that directory and it will available in the list and for running.
 
 ```
 launch_params/           # Model configs (one TOML per model)

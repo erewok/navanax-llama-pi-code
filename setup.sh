@@ -33,27 +33,23 @@ info "macOS on Apple Silicon with ${RAM_GB}GB unified memory"
 
 # --- Homebrew ---
 if command -v brew &>/dev/null; then
-    info "Homebrew: already installed"
+    info "Homebrew present"
 else
-    step "Installing Homebrew"
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-    eval "$(/opt/homebrew/bin/brew shellenv)"
+    error "Homebrew is required but not found. Please install Homebrew first: https://brew.sh/"
+fi
+
+# --- Node.js ---
+if command -v node &>/dev/null; then
+    info "Node.js: already installed ($(node --version))"
+else
+    error "Node.js is required but not found. Please install Node.js first: https://nodejs.org/"
 fi
 
 # --- just ---
 if command -v just &>/dev/null; then
     info "just: already installed ($(just --version))"
 else
-    step "Installing just (task runner)"
-    brew install just
-fi
-
-# --- uv ---
-if command -v uv &>/dev/null; then
-    info "uv: already installed ($(uv --version))"
-else
-    step "Installing uv (Python package manager)"
-    brew install uv
+    error "just not found: proceeding with basic setup. You run the Python package directly."
 fi
 
 # --- llama.cpp ---
@@ -62,14 +58,6 @@ if command -v llama-server &>/dev/null; then
 else
     step "Installing llama.cpp (local LLM inference server)"
     brew install llama.cpp
-fi
-
-# --- Node.js ---
-if command -v node &>/dev/null; then
-    info "Node.js: already installed ($(node --version))"
-else
-    step "Installing Node.js"
-    brew install node
 fi
 
 # --- pi-coding-agent ---
@@ -105,6 +93,9 @@ echo "       just run"
 echo ""
 echo "  3. In another terminal, start pi in your project:"
 echo "       cd /path/to/your/project && pi"
+echo ""
+echo "  4. Copy the provided user-config.sample.toml to user-config.toml and customize as needed:"
+echo "       cp user-config.sample.toml user-config.toml"
 echo ""
 echo "  See README.md for full usage details."
 echo ""
