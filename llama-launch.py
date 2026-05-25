@@ -454,7 +454,6 @@ def cmd_launch(model_key: str) -> None:
         "--prio", "2",
         "--poll", "100",
         "--poll-batch", "1",
-        "--log-disable",
     ]
 
     # Write PID file before launching (llama-server writes its own PID)
