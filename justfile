@@ -43,6 +43,10 @@ enable model:
 disable model:
     uv run python llama-launch.py disable {{model}}
 
+# Delete a downloaded model, with prompt to also remove the launch-param (e.g. just rm qwen3-35b-q8)
+rm model:
+    uv run python llama-launch.py rm-model {{model}}
+
 # Tail the llama-server log
 logs:
     tail -f logs/llama-server.log

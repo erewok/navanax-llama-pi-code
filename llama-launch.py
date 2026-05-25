@@ -12,6 +12,7 @@ USAGE:
   python llama-launch.py generate-models # regenerate models.json from TOMLs
   python llama-launch.py enable <key>    # enable a model
   python llama-launch.py disable <key>   # disable a model
+  python llama-launch.py rm-model <key>  # delete downloaded model files
 """
 
 import json
@@ -564,6 +565,80 @@ def _ensure_user_config() -> dict[str, bool]:
     return enabled_map
 
 
+def cmd_rm_model(model_key: str) -> None:
+    """Delete locally downloaded model files, with optional launch-param removal."""
+    if model_key not in ALL_MODELS:
+        console.print(f"[red]Unknown model:[/] {model_key}")
+        console.print(f"[dim]Available: {', '.join(sorted(ALL_MODELS.keys()))}[/]")
+        sys.exit(1)
+
+    model = ALL_MODELS[model_key]
+    manifest = _manifest_file(model_key)
+
+    if not manifest.exists():
+        console.print(f"[yellow]⚠[/]  No downloaded files found for [cyan]{model_key}[/]")
+    else:
+        repo_prefix = model.hf_repo.replace("/", "_")
+
+        with open(manifest) as f:
+            manifest_data = json.load(f)
+
+        files_to_delete: list[Path] = [manifest]
+
+        # Model shard files + etags — glob captures all shards automatically
+        gguf_rfilename = manifest_data.get("ggufFile", {}).get("rfilename", "")
+        if gguf_rfilename:
+            tag_dir = gguf_rfilename.split("/")[0] if "/" in gguf_rfilename else model.hf_tag
+            files_to_delete += sorted(CACHE_DIR.glob(f"{repo_prefix}_{tag_dir}_*"))
+
+        # mmproj file — skip if another downloaded model in the same repo shares it
+        mmproj_rfilename = manifest_data.get("mmprojFile", {}).get("rfilename", "")
+        if mmproj_rfilename:
+            mmproj_cache = CACHE_DIR / f"{repo_prefix}_{mmproj_rfilename}"
+            siblings_downloaded = [
+                k for k, m in ALL_MODELS.items()
+                if k != model_key and m.hf_repo == model.hf_repo and _manifest_file(k).exists()
+            ]
+            if siblings_downloaded:
+                console.print(
+                    f"[dim]Skipping mmproj (shared with: {', '.join(siblings_downloaded)})[/]"
+                )
+            else:
+                for p in [mmproj_cache, mmproj_cache.with_suffix(mmproj_cache.suffix + ".etag")]:
+                    if p.exists():
+                        files_to_delete.append(p)
+
+        total_bytes = sum(p.stat().st_size for p in files_to_delete if p.is_file())
+        total_gb = total_bytes / 1024 ** 3
+
+        console.print(f"\nFiles to delete ([bold]{total_gb:.1f} GB[/]):")
+        for p in files_to_delete:
+            console.print(f"  [dim]{p.name}[/]")
+
+        confirm = Prompt.ask("\nDelete these files?", choices=["y", "n"], default="n")
+        if confirm != "y":
+            console.print("[dim]Aborted.[/]")
+            return
+
+        for p in files_to_delete:
+            p.unlink(missing_ok=True)
+        console.print(f"[green]✓[/] Deleted model files for [cyan]{model_key}[/]")
+
+    # Offer to remove the launch-param TOML
+    param_file = PARAMS_DIR / f"{model_key}.toml"
+    if param_file.exists():
+        choice = Prompt.ask(
+            f"\nAlso delete launch param [cyan]{param_file.name}[/]?",
+            choices=["y", "n"],
+            default="n",
+        )
+        if choice == "y":
+            param_file.unlink()
+            console.print(f"[green]✓[/] Deleted [cyan]{param_file.name}[/]")
+        else:
+            console.print(f"[dim]Kept {param_file.name}[/]")
+
+
 def cmd_enable(model_key: str) -> None:
     """Enable a model in user-config.toml."""
     if model_key not in ALL_MODELS:
@@ -699,6 +774,11 @@ def main() -> None:
                 console.print("[red]Usage:[/] python llama-launch.py disable <model-key>")
                 sys.exit(1)
             cmd_disable(sys.argv[2])
+        case "rm-model":
+            if len(sys.argv) < 3:
+                console.print("[red]Usage:[/] python llama-launch.py rm-model <model-key>")
+                sys.exit(1)
+            cmd_rm_model(sys.argv[2])
         case key if key in MODELS:
             cmd_launch(key)
         case key if key in ALL_MODELS:
@@ -716,7 +796,7 @@ def main() -> None:
             console.print(
                 Panel(
                     f"Unknown command: [red]{command}[/]\n\n"
-                    f"Available: [cyan]stop, status, list, generate-models, enable, disable[/]\n"
+                    f"Available: [cyan]stop, status, list, generate-models, enable, disable, rm-model[/]\n"
                     f"Models: [cyan]{', '.join(sorted(MODELS.keys()))}[/]\n"
                     f"[dim]Run without arguments for interactive selector[/]",
                     title="[bold red]Error[/]",
