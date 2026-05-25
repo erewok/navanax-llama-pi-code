@@ -1,0 +1,30 @@
+# Gemma 4 26B-A4B MoE — Q8_0 (~27GB)
+# MoE: 4B active per token — fast inference, good for quick code tasks.
+# M5 Pro 64GB: 131k context with q8_0 KV (~49GB total). 15GB headroom.
+# Use 31B config for deep code review/architecture; use this for fast iteration.
+# repeat_penalty suppresses Gemma 4's documented looping bug (llama.cpp #21375, #21516).
+# reasoning = false: Gemma 4 does NOT use DeepSeek's format; --reasoning-format deepseek corrupts output.
+
+[hf]
+repo = "unsloth/gemma-4-26B-A4B-it-GGUF"
+tag  = "Q8_0"
+
+[meta]
+name    = "Gemma 4 26B-A4B Q8_0 MoE (Local)"
+quant   = "Q8_0"
+size_gb = 27
+moe     = true
+active_params_b = 4
+
+[launch]
+threads        = 10
+batch          = 1024
+ubatch         = 256
+context        = 131072
+kv_cache_k     = "q8_0"
+kv_cache_v     = "q8_0"
+reasoning      = false
+max_tokens     = 32768
+context_window = 131072
+repeat_penalty = 1.05
+repeat_last_n  = 128

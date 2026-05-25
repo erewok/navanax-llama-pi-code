@@ -69,6 +69,8 @@ class Model:
     reasoning: bool = True
     max_tokens: int = 8192
     context_window: int = 131072
+    repeat_penalty: float = 1.0
+    repeat_last_n: int = 64
 
     @property
     def hf_id(self) -> str:
@@ -131,6 +133,8 @@ def load_all_models() -> dict[str, Model]:
             reasoning=launch["reasoning"],
             max_tokens=launch["max_tokens"],
             context_window=launch["context_window"],
+            repeat_penalty=launch.get("repeat_penalty", 1.0),
+            repeat_last_n=launch.get("repeat_last_n", 64),
         )
 
     return models
@@ -402,6 +406,7 @@ def cmd_launch(model_key: str) -> None:
         f"[cyan]KV cache:[/]   K={model.kv_cache_k}, V={model.kv_cache_v}",
         f"[cyan]Max tokens:[/] {model.max_tokens}",
         f"[cyan]Reasoning:[/]  {'deepseek' if model.reasoning else 'disabled'}",
+        f"[cyan]Repeat pen:[/] {model.repeat_penalty} (last {model.repeat_last_n} tokens)",
     ]
 
     console.print(
@@ -444,6 +449,8 @@ def cmd_launch(model_key: str) -> None:
         "--slot-save-path", str(CACHE_DIR),
         "--log-file", str(LOG_DIR / "llama-server.log"),
         "--mlock",
+        *(["--repeat-penalty", str(model.repeat_penalty),
+           "--repeat-last-n", str(model.repeat_last_n)] if model.repeat_penalty > 1.0 else []),
         "--prio", "2",
         "--poll", "100",
         "--poll-batch", "1",
