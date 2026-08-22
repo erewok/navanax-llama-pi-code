@@ -21,16 +21,19 @@
 # [launcher]
 # default = "qwen3-35b-q8"
 
+[gemma4-26b-moe-q8]
+enabled = false
+
 [gemma4-27b-q8]       # Gemma 4 27B A4B Q8_0 — ~28GB, MoE (4B active)
 enabled = true
+
+[gemma4-31b-bf16]
+enabled = false
 
 [gemma4-31b-q8]       # Gemma 4 31B Q8_0 — ~35GB, dense (31B active)
 enabled = true
 
 [qwen3-35b-bf16]      # Qwen3.6 35B-A3B BF16 — ~70GB, MoE (3B active)
-enabled = true
-
-[qwen3-35b-q6]        # Qwen3.6 35B-A3B Q6_K — ~25GB, MoE (3B active)
 enabled = true
 
 [qwen3-35b-q8]        # Qwen3.6 35B-A3B Q8_0 — ~37GB, MoE (3B active)

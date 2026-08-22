@@ -102,6 +102,16 @@ max_tokens     = 8192
 context_window = 131072
 ```
 
-Then run `just generate-models` to update `pi-models.json`.
+Then run `just generate-pi-models` to update `pi-models.json`.
 
 See [model-tuning.md](model-tuning.md) for what each parameter means and recommended defaults for different Mac configurations.
+
+
+## Monitoring
+
+I have used the following terminal tools to monitor process and GPU usage:
+
+- btop
+- nvtop
+
+There are many alternatives.

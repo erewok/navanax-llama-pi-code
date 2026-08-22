@@ -160,6 +160,63 @@ You have ~8 GB after macOS overhead. Only small models fit.
 
 **Alternative for 128 GB:** Run the 35B-A3B at Q8_0 with `f16` KV cache and 256k context (~67 GB total). Maximum KV quality with a smaller, faster model.
 
+## The Metal Wired Limit (Apple Silicon)
+
+The memory budget above tells you whether a model fits in *physical* RAM. On
+Apple Silicon there is a second, lower ceiling: macOS caps how much unified
+memory the GPU may wire down. The default is roughly 75% of RAM — about
+**48 GB on a 64 GB machine**. Exceed it and llama-server dies during compute
+with:
+
+```
+ggml_metal_synchronize: error: command buffer 1 failed with status 5
+error: Insufficient Memory (00000008:kIOGPUCommandBufferCallbackErrorOutOfMemory)
+```
+
+This is *not* a shortage of physical RAM — it is the Metal allocation cap, and
+it bites well before you run out of memory. The launcher always passes
+`--mlock`, so the whole model wants to be wired.
+
+Check and raise it (resets on reboot):
+
+```sh
+sysctl iogpu.wired_limit_mb          # 0 means "default"
+sudo sysctl iogpu.wired_limit_mb=57344   # 56 GB
+```
+
+Raising it to 56 GB on a 64 GB machine leaves only ~8 GB for macOS and
+everything else. It works, but with no margin — a browser with many tabs will
+push you into swap. Prefer a model that fits under the default ceiling.
+
+**Practical 64 GB ceiling:** keep `model + KV + ~2 GB compute buffers` under
+~46 GB and you never have to touch the sysctl.
+
+## Frontier Open-Weight Models: What Does Not Fit
+
+Periodically worth rechecking as new quants land, but as of August 2026:
+
+| Model | Total / active | Smallest GGUF | Fits 64 GB? |
+|-------|----------------|---------------|-------------|
+| Kimi K2.7-Code | 1T / 32B | 304 GB (UD-IQ1_M) | No — 5-6x over, even ternary builds are ~200 GB |
+| DeepSeek V4-Flash | 284B / 13B | 82.5 GB (UD-IQ1_S) | No — ~35 GB over, and 1-bit wrecks coding reliability |
+| DeepSeek V4-Pro | 1.6T / 49B | — | No |
+
+DeepSeek ships no official GGUFs; all are community quants, and the FP8/MXFP4
+builds need a llama.cpp fork with the `deepseek-v4-flash` arch — stock upstream
+will not load them.
+
+The largest thing that actually runs on 64 GB is **Qwen3.5 122B-A10B at 2-3 bit**
+(see `qwen35-122b-q2kxl.toml` / `qwen35-122b-iq3s.toml`). Qwen3.5 is
+hybrid-attention — only 12 of its 48 layers are full attention, with 2 KV heads
+at head_dim 256 — so KV costs only ~12 KB/token at q8_0. That means 128k context
+is ~1.6 GB and even 256k is ~3.2 GB; context is cheap here, weights are not.
+
+Open question worth settling empirically: 122B-A10B at 2-bit versus
+`qwen3-35b-q8` (37 GB, near-lossless). Bigger model at worse quantization is not
+automatically the better coder. The 2-bit failure mode to watch for in pi-code is
+not gibberish but drift — malformed tool calls, losing earlier constraints on
+long multi-step edits.
+
 ## Other Launch Flags
 
 These are set by the launcher and generally don't need per-model tuning:
