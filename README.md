@@ -32,7 +32,7 @@ After setup, pick the models that fit your machine and disable the rest:
 
 ```bash
 just list                         # See all models with sizes
-just disable qwen35-122b-q6       # Too big? Disable it
+just disable gemma4-31b-bf16       # Too big? Disable it
 just run                          # Launch — only enabled models appear
 ```
 
@@ -44,7 +44,7 @@ If you skip this step, all models are enabled by default. See [model-tuning.md](
 
 ```bash
 just run                        # Interactive model selector
-just launch qwen3-35b-q8       # Launch a specific model
+just launch qwen38-27b-q8       # Launch a specific model
 just stop                       # Stop the running server
 just status                     # Check if server is running
 just list                       # List all models (enabled and disabled)

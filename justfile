@@ -15,7 +15,7 @@ sync:
 run:
     uv run python llama-launch.py
 
-# Launch a specific model by key (e.g. just launch qwen35-122b-q6)
+# Launch a specific model by key (e.g. just launch gemma4-31b-bf16)
 launch model:
     uv run python llama-launch.py {{model}}
 
@@ -35,15 +35,15 @@ status:
 generate-pi-models:
     uv run python llama-launch.py generate-models
 
-# Enable a model (e.g. just enable qwen3-35b-q8)
+# Enable a model (e.g. just enable qwen38-27b-q8)
 enable model:
     uv run python llama-launch.py enable {{model}}
 
-# Disable a model (e.g. just disable qwen35-122b-q6)
+# Disable a model (e.g. just disable gemma4-31b-bf16)
 disable model:
     uv run python llama-launch.py disable {{model}}
 
-# Delete a downloaded model, with prompt to also remove the launch-param (e.g. just rm qwen3-35b-q8)
+# Delete a downloaded model, with prompt to also remove the launch-param (e.g. just rm qwen38-27b-q8)
 rm model:
     uv run python llama-launch.py rm-model {{model}}
 
