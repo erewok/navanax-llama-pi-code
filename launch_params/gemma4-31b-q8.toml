@@ -1,7 +1,10 @@
-# Gemma 4 31B — Q8_0 (~35GB)
+# Gemma 4 31B — Q8_0 (~33GB)
 # Dense model, all 31B active. Best for code review and architecture planning.
-# M5 Pro 64GB: 256k context with q4_0 KV (~57GB total). ~7GB headroom.
-# q4_0 KV halves per-token cache cost vs q8_0, enabling 256k at same RAM as 131k+q8_0.
+# M5 Pro 64GB: 256k context with q4_0 KV. ~42GB total, under the ~46GB Metal wired limit.
+#   weights 32.6GB + vision projector 1.2GB + KV 7.0GB + ~1GB compute buffers
+# q8_0 KV at 256k would need ~48GB total, which exceeds the Metal limit.
+# q4_0 KV at 256k costs about the same memory as q8_0 KV at 131k (~42GB total).
+# KV math: see model-tuning.md, "Gemma 4 KV cache".
 # repeat_penalty + repeat_last_n suppress Gemma 4's documented looping bug (llama.cpp #21375, #21516).
 # reasoning = false: Gemma 4 does NOT use DeepSeek's format; --reasoning-format deepseek corrupts output.
 
@@ -12,7 +15,7 @@ tag  = "Q8_0"
 [meta]
 name    = "Gemma 4 31B Q8_0 (Local)"
 quant   = "Q8_0"
-size_gb = 35
+size_gb = 33
 moe     = false
 active_params_b = 31
 

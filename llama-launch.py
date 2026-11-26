@@ -72,11 +72,68 @@ class Model:
     context_window: int = 131072
     repeat_penalty: float = 1.0
     repeat_last_n: int = 64
+    # Sampling. If top_p or top_k is None, llama-server uses its own default.
+    temperature: float = 0.0
+    top_p: float | None = None
+    top_k: int | None = None
+    # Thinking mode passed to `--reasoning`: "on", "off" or "auto".
+    # If thinking is None, the launcher omits the flag and llama-server
+    # detects thinking support from the chat template.
+    thinking: str | None = None
+    # If vision is False, llama-server skips the multimodal projector
+    # that `-hf` downloads and loads alongside the model.
+    vision: bool = True
+    # Maximum thinking tokens per response, passed to `--reasoning-budget`.
+    # If thinking_budget is None, thinking has no limit.
+    thinking_budget: int | None = None
+    # Speculative decoding type passed to `--spec-type`, e.g. "draft-mtp".
+    # For draft-mtp, llama-server finds the drafter in the `-hf` repo itself.
+    spec_type: str | None = None
 
     @property
     def hf_id(self) -> str:
         """Full HuggingFace identifier: repo:tag"""
         return f"{self.hf_repo}:{self.hf_tag}"
+
+    @property
+    def emits_reasoning(self) -> bool:
+        """True if the server returns reasoning text that pi should display."""
+        return self.reasoning or self.thinking == "on"
+
+    def sampling_args(self) -> list[str]:
+        """llama-server sampling flags for this model."""
+        args = ["--temp", str(self.temperature)]
+        if self.top_p is not None:
+            args += ["--top-p", str(self.top_p)]
+        if self.top_k is not None:
+            args += ["--top-k", str(self.top_k)]
+        return args
+
+    def thinking_args(self) -> list[str]:
+        """llama-server flags for the chat template's thinking mode and its token budget."""
+        args = ["--reasoning", self.thinking] if self.thinking else []
+        if self.thinking_budget is not None:
+            args += ["--reasoning-budget", str(self.thinking_budget)]
+        return args
+
+    def spec_args(self) -> list[str]:
+        """llama-server flags for speculative decoding."""
+        return ["--spec-type", self.spec_type] if self.spec_type else []
+
+
+THINKING_VALUES = ("on", "off", "auto")
+
+
+def _read_thinking(launch: dict, toml_file: Path) -> str | None:
+    """Read the optional `thinking` key and reject values llama-server does not accept."""
+    thinking = launch.get("thinking")
+    if thinking is None or thinking in THINKING_VALUES:
+        return thinking
+    console.print(
+        f"[red]✗[/] {toml_file.name}: thinking = {thinking!r} is invalid. "
+        f"Use one of: {', '.join(THINKING_VALUES)}."
+    )
+    sys.exit(1)
 
 
 def _load_user_config() -> dict[str, bool] | None:
@@ -136,6 +193,13 @@ def load_all_models() -> dict[str, Model]:
             context_window=launch["context_window"],
             repeat_penalty=launch.get("repeat_penalty", 1.0),
             repeat_last_n=launch.get("repeat_last_n", 64),
+            temperature=launch.get("temperature", 0.0),
+            top_p=launch.get("top_p"),
+            top_k=launch.get("top_k"),
+            thinking=_read_thinking(launch, toml_file),
+            vision=launch.get("vision", True),
+            thinking_budget=launch.get("thinking_budget"),
+            spec_type=launch.get("spec_type"),
         )
 
     return models
@@ -371,6 +435,47 @@ def cmd_download(model_key: str) -> None:
         sys.exit(130)
 
 
+def build_server_cmd(model: Model) -> list[str]:
+    """Build the llama-server command line for a model."""
+    reasoning_flag = ["--reasoning-format", "deepseek"] if model.reasoning else []
+    repeat_flags = (
+        ["--repeat-penalty", str(model.repeat_penalty),
+         "--repeat-last-n", str(model.repeat_last_n)]
+        if model.repeat_penalty > 1.0 else []
+    )
+    return [
+        "llama-server",
+        "-hf", model.hf_id,
+        "--host", HOST,
+        "--port", str(PORT),
+        "--jinja",
+        *reasoning_flag,
+        *model.thinking_args(),
+        *([] if model.vision else ["--no-mmproj"]),
+        *model.spec_args(),
+        "-ngl", "99",
+        "-fa", "auto",
+        "-c", str(model.context),
+        "-t", str(model.threads),
+        "-b", str(model.batch),
+        "-ub", str(model.ubatch),
+        "-n", str(model.max_tokens),
+        *model.sampling_args(),
+        "--cache-type-k", model.kv_cache_k,
+        "--cache-type-v", model.kv_cache_v,
+        "--slot-save-path", str(CACHE_DIR),
+        "--log-file", str(LOG_DIR / "llama-server.log"),
+        # mmap maps the weights straight from the GGUF file, and mlock pins
+        # those pages so macOS cannot swap them out. The deprecated `--mlock`
+        # flag copied the weights into anonymous memory instead.
+        "--load-mode", "mmap+mlock",
+        *repeat_flags,
+        "--prio", "2",
+        "--poll", "100",
+        "--poll-batch", "1",
+    ]
+
+
 def cmd_launch(model_key: str) -> None:
     """Launch llama-server with the specified model."""
     if model_key not in MODELS:
@@ -406,7 +511,12 @@ def cmd_launch(model_key: str) -> None:
         f"[cyan]Context:[/]    {model.context}",
         f"[cyan]KV cache:[/]   K={model.kv_cache_k}, V={model.kv_cache_v}",
         f"[cyan]Max tokens:[/] {model.max_tokens}",
-        f"[cyan]Reasoning:[/]  {'deepseek' if model.reasoning else 'disabled'}",
+        f"[cyan]Thinking:[/]   {model.thinking or 'template default'}"
+        + (f" (budget {model.thinking_budget} tokens)" if model.thinking_budget is not None else ""),
+        f"[cyan]Speculative:[/] {model.spec_type or 'off'}",
+        f"[cyan]Think parse:[/] {'deepseek' if model.reasoning else 'auto'}",
+        f"[cyan]Vision:[/]     {'on' if model.vision else 'off (--no-mmproj)'}",
+        f"[cyan]Sampling:[/]   {' '.join(model.sampling_args())}",
         f"[cyan]Repeat pen:[/] {model.repeat_penalty} (last {model.repeat_last_n} tokens)",
     ]
 
@@ -421,41 +531,12 @@ def cmd_launch(model_key: str) -> None:
     # Download if needed
     cmd_download(model_key)
 
-    # Build reasoning flag
-    reasoning_flag = ["--reasoning-format", "deepseek"] if model.reasoning else []
-
     # Environment
     env = os.environ.copy()
     env["LLAMA_CACHE"] = str(CACHE_DIR)
     env["LLAMA_SERVER_LOG_FILE"] = str(LOG_DIR / "llama-server.log")
 
-    # Build command
-    cmd = [
-        "llama-server",
-        "-hf", model.hf_id,
-        "--host", HOST,
-        "--port", str(PORT),
-        "--jinja",
-        *reasoning_flag,
-        "-ngl", "99",
-        "-fa", "auto",
-        "-c", str(model.context),
-        "-t", str(model.threads),
-        "-b", str(model.batch),
-        "-ub", str(model.ubatch),
-        "-n", str(model.max_tokens),
-        "--temp", "0.0",
-        "--cache-type-k", model.kv_cache_k,
-        "--cache-type-v", model.kv_cache_v,
-        "--slot-save-path", str(CACHE_DIR),
-        "--log-file", str(LOG_DIR / "llama-server.log"),
-        "--mlock",
-        *(["--repeat-penalty", str(model.repeat_penalty),
-           "--repeat-last-n", str(model.repeat_last_n)] if model.repeat_penalty > 1.0 else []),
-        "--prio", "2",
-        "--poll", "100",
-        "--poll-batch", "1",
-    ]
+    cmd = build_server_cmd(model)
 
     # Write PID file before launching (llama-server writes its own PID)
     # Use subprocess.run to keep the server in the foreground.
@@ -482,7 +563,7 @@ def cmd_generate_models() -> None:
         models_list.append({
             "id": m.hf_id,
             "name": m.name,
-            "reasoning": m.reasoning,
+            "reasoning": m.emits_reasoning,
             "input": ["text"],
             "contextWindow": m.context_window,
             "maxTokens": m.max_tokens,

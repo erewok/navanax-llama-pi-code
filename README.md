@@ -100,6 +100,15 @@ kv_cache_v     = "q8_0"
 reasoning      = true
 max_tokens     = 8192
 context_window = 131072
+
+# Optional keys
+# thinking    = "on"    # "on", "off" or "auto"; passed to --reasoning
+# temperature = 1.0     # defaults to 0.0
+# top_p       = 0.95
+# top_k       = 64
+# vision      = false   # skip the multimodal projector; defaults to true
+# thinking_budget = 2048  # cap thinking tokens per response
+# spec_type   = "draft-mtp"  # speculative decoding with the repo's MTP drafter
 ```
 
 Then run `just generate-pi-models` to update `pi-models.json`.

@@ -1,7 +1,8 @@
 # Gemma 4 31B — BF16 (~61GB)
 # Dense model, full BF16 precision — best possible code generation quality.
-# M3 Max 128GB: 256k context with q8_0 KV (~105GB total). ~23GB headroom.
-# BF16 weights (61.4GB) + q8_0 KV (44GB) = ~105GB — exceeds >100GB target.
+# M3 Max 128GB: 256k context with q8_0 KV. ~77GB total, under the ~96GB Metal wired limit.
+#   weights 61.4GB + vision projector 1.2GB + KV 13.3GB + ~1GB compute buffers
+# KV math: see model-tuning.md, "Gemma 4 KV cache".
 # q8_0 KV doubles precision vs q4_0, improving multi-turn accuracy at long context.
 # repeat_penalty + repeat_last_n suppress Gemma 4's documented looping bug (llama.cpp #21375, #21516).
 # reasoning = false: Gemma 4 does NOT use DeepSeek's format; --reasoning-format deepseek corrupts output.

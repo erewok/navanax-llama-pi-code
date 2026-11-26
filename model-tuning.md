@@ -31,9 +31,20 @@ This document explains the parameters in our TOML configs and provides recommend
 | `context` | `-c` | Maximum context window in tokens passed to llama-server. This is how much text the model can "see" at once. |
 | `kv_cache_k` | `--cache-type-k` | Quantization for the KV cache key tensors. Options: `f16`, `q8_0`, `q4_0`. |
 | `kv_cache_v` | `--cache-type-v` | Quantization for the KV cache value tensors. Same options as above. |
-| `reasoning` | `--reasoning-format` | Enable chain-of-thought reasoning (uses `deepseek` format). |
+| `reasoning` | `--reasoning-format` | Parse reasoning in DeepSeek's `<think>` format. Only set this for models that use that format. Gemma 4 does not. If `reasoning = false`, the launcher omits the flag and llama-server uses its default format, `auto`. That format still extracts thinking for templates it recognizes. The launch panel shows this as "Think parse". |
+| `thinking` | `--reasoning` | Optional. Turns the chat template's thinking mode `"on"` or `"off"`, or lets llama-server decide (`"auto"`). If you leave it out, the launcher omits the flag and llama-server detects support from the template. Use this key for Gemma 4. |
 | `max_tokens` | `-n` | Maximum tokens per response. |
 | `context_window` | _(pi-models.json)_ | Context window reported to pi-coding-agent. This controls when the agent triggers compaction. Can differ from `context` if you want the agent to compact earlier than the server's hard limit. |
+| `temperature` | `--temp` | Optional. Sampling temperature. Defaults to `0.0`, which makes output deterministic. |
+| `top_p` | `--top-p` | Optional. Nucleus sampling cutoff. If you leave it out, llama-server uses its default (0.95). |
+| `top_k` | `--top-k` | Optional. Keep only the k most likely tokens. If you leave it out, llama-server uses its default (40). |
+| `thinking_budget` | `--reasoning-budget` | Optional. Maximum thinking tokens per response. When the model reaches the budget, llama-server ends the thinking and the model writes its answer. If you leave it out, thinking has no limit. |
+| `spec_type` | `--spec-type` | Optional. Speculative decoding type. `"draft-mtp"` uses the model's multi-token-prediction drafter: a small model that proposes several tokens, which the main model checks in one pass. With `-hf`, llama-server downloads the drafter from the same repo. On the Gemma 4 31B QAT it raised decode speed from 14 to 22–27 tok/s. It does not speed up prompt reading. |
+| `vision` | `--no-mmproj` | Optional. Defaults to `true`. If `false`, llama-server skips the multimodal projector file that `-hf` loads with the model. That saves about 1.2 GB on Gemma 4. |
+
+pi-coding-agent shows a model's reasoning if `reasoning = true` or `thinking = "on"`. The launcher writes that flag into `pi-models.json`.
+
+**Gemma 4 sampling:** Google and Unsloth recommend `temperature = 1.0`, `top_p = 0.95` and `top_k = 64` for every Gemma 4 model. The QAT config uses these values. The older Gemma 4 configs still use `temperature = 0.0`.
 
 ## Understanding KV Cache
 
@@ -51,6 +62,32 @@ KV bytes per token = 2 (K+V) x layers x kv_heads x head_dim x bytes_per_element
 | `f16` | 2.0 | 100% | Best | You have plenty of RAM headroom |
 | `q8_0` | 1.0 | 50% | Very good | Default choice — minimal quality loss |
 | `q4_0` | 0.5 | 25% | Good | Memory-constrained, large context needed |
+
+### Gemma 4 KV cache
+
+Gemma 4 mixes two kinds of attention layer, so the simple formula above overstates its KV cache by about 4×.
+
+- **Full-attention layers** see the whole context. Their cache grows with every token.
+- **Sliding-window layers** see only the last 1024 tokens. llama.cpp sizes their cache to the window, so their cost is fixed. With 4 server slots, the window cache holds about 4 × 1024 + 256 = 4352 cells.
+
+| Model | Full-attention layers | KV heads × dim | Sliding layers | KV heads × dim |
+|-------|-----------------------|----------------|----------------|----------------|
+| 31B | 10 | 4 × 512 | 50 | 16 × 256 |
+| 26B-A4B | 5 | 2 × 512 | 25 | 8 × 256 |
+
+Plugging in the real sizes of q8_0 (1.0625 bytes/element) and q4_0 (0.5625 bytes/element):
+
+| Model | KV type | Per token | Fixed window cache | 131k total | 256k total |
+|-------|---------|-----------|--------------------|------------|------------|
+| 31B | q8_0 | 43.5 KB | 1.9 GB | 7.6 GB | 13.3 GB |
+| 31B | q4_0 | 23.0 KB | 1.0 GB | 4.0 GB | 7.0 GB |
+| 26B-A4B | q8_0 | 10.9 KB | 0.5 GB | 1.9 GB | 3.3 GB |
+
+Measurements back this up. The 31B QAT model at 256k context with q8_0 KV used about 29 GB: 16.1 GB of resident weights plus 12.5 GB of KV and compute buffers. The table predicted about 31 GB.
+
+**Measuring memory.** The launcher memory-maps the weights, and `footprint -p <pid>` leaves out memory-mapped files. That means `footprint` shows only KV and buffers. To see the full total, run `vmmap --summary <pid>` and add the "mapped file" resident size to the "Physical footprint".
+
+The `-hf` flag also downloads and loads Gemma 4's 1.2 GB vision projector. If you only send text, set `vision = false` in `[launch]` to skip it.
 
 ## Memory Budget
 
@@ -175,7 +212,7 @@ error: Insufficient Memory (00000008:kIOGPUCommandBufferCallbackErrorOutOfMemory
 
 This is *not* a shortage of physical RAM — it is the Metal allocation cap, and
 it bites well before you run out of memory. The launcher always passes
-`--mlock`, so the whole model wants to be wired.
+`--load-mode mmap+mlock`, so the whole model wants to be wired.
 
 Check and raise it (resets on reboot):
 
@@ -225,9 +262,8 @@ These are set by the launcher and generally don't need per-model tuning:
 |------|-------|---------|
 | `-ngl 99` | Always | Offload all layers to Metal GPU. This is the single biggest performance lever on Apple Silicon. |
 | `-fa auto` | Always | Flash attention — critical for long context performance. |
-| `--mlock` | Always | Pin model in RAM to prevent macOS from swapping it out. |
+| `--load-mode mmap+mlock` | Always | Memory-map the model file and pin it in RAM so macOS cannot swap it out. Replaces the deprecated `--mlock`, which copied the weights into anonymous memory instead of mapping them. |
 | `--prio 2` | Always | High process priority. |
-| `--temp 0.0` | Always | Deterministic output for coding tasks. |
 | `--jinja` | Always | Enable Jinja2 chat templates. |
 | `--poll 100` | Always | Maximum Metal polling frequency (reduces latency). |
 | `--poll-batch 1` | Always | Minimal batch polling overhead. |

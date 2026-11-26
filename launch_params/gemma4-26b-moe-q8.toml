@@ -1,6 +1,9 @@
 # Gemma 4 26B-A4B MoE — Q8_0 (~27GB)
 # MoE: 4B active per token — fast inference, good for quick code tasks.
-# M5 Pro 64GB: 131k context with q8_0 KV (~49GB total). 15GB headroom.
+# M5 Pro 64GB: 131k context with q8_0 KV. ~31GB total.
+#   weights 26.9GB + vision projector 1.2GB + KV 1.9GB + ~1GB compute buffers
+# KV is very cheap on this model: 256k context would add only ~1.4GB.
+# KV math: see model-tuning.md, "Gemma 4 KV cache".
 # Use 31B config for deep code review/architecture; use this for fast iteration.
 # repeat_penalty suppresses Gemma 4's documented looping bug (llama.cpp #21375, #21516).
 # reasoning = false: Gemma 4 does NOT use DeepSeek's format; --reasoning-format deepseek corrupts output.
